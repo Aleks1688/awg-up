@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# awg-up.sh — одноразовый VPS -> AmneziaWG 2.0 сервер + готовый конфиг для роутера.
+# awg-up.sh — одноразовый VPS -> AmneziaWG 3.1 сервер + готовый конфиг для роутера.
 # Обёртка над https://github.com/bivlked/amneziawg-installer (Ubuntu 24.04).
 #
 # Запускать от root на ЧИСТОМ VPS. Скрипт сам понимает, на каком он шаге:
