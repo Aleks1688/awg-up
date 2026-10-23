@@ -6,6 +6,7 @@
 ###################################################################################################
 
 curl -fsSL https://raw.githubusercontent.com/Aleks1688/awg-up/main/awg-up.sh -o awg-up.sh
+
 bash awg-up.sh
 
 awg-up.sh — одноразовый VPS -> AmneziaWG 3.1 сервер + готовый конфиг для роутера.
