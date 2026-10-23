@@ -24,4 +24,5 @@ awg-up.sh — одноразовый VPS -> AmneziaWG 3.1 сервер + гот�
 ###################################################################################################
 
 curl -fsSL https://raw.githubusercontent.com/Aleks1688/awg-up/main/awg2-up.sh -o awg2-up.sh
+
 bash awg2-up.sh
