@@ -4,6 +4,7 @@
 ########################################
 
 запуск скрипта для установки AWG ver 3.1
+
 ########################################
 
 curl -fsSL https://raw.githubusercontent.com/Aleks1688/awg-up/main/awg-up.sh -o awg-up.sh
@@ -23,6 +24,7 @@ awg-up.sh — одноразовый VPS -> AmneziaWG 3.1 сервер + гот�
 ######################################
 
 запуск скрипта для установки AWG ver 2
+
 ######################################
 
 curl -fsSL https://raw.githubusercontent.com/Aleks1688/awg-up/main/awg2-up.sh -o awg2-up.sh
