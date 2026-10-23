@@ -60,6 +60,44 @@ download_installer() {
   chmod +x "$INSTALLER_PATH"
 }
 
+# ---------- Режим диагностики: bash awg2-up.sh diag ----------
+# Собирает всё, что нужно, чтобы понять, почему "рукопожатие есть, интернета нет".
+diag() {
+  if [ ! -e "$AWG_DIR/params" ]; then
+    echo "Сервер ещё не установлен." >&2
+    exit 1
+  fi
+  NIC="$(get_param SERVER_AWG_NIC)"
+  NIC="${NIC:-awg0}"
+  local conf
+  conf="$(find_client_conf)"
+
+  echo "##### ip_forward";        sysctl net.ipv4.ip_forward 2>&1 || true
+  echo "##### docker";            if command -v docker >/dev/null 2>&1; then echo "docker: установлен"; else echo "docker: нет"; fi
+  echo "##### iptables FORWARD";  iptables -S FORWARD 2>&1 || true
+  echo "##### DOCKER-USER";       iptables -S DOCKER-USER 2>&1 || true
+  echo "##### nft таблица туннеля"; nft list table ip "awg-$NIC" 2>&1 || true
+  echo "##### ping с сервера";    ping -c 2 -W 2 1.1.1.1 2>&1 | tail -n 3 || true
+  echo "##### awg show (без ключей)"
+  awg show 2>&1 | grep -vE "private key|preshared key" || true
+  echo "##### клиентский конфиг (без ключей)"
+  if [ -n "$conf" ]; then
+    grep -E "^(Address|DNS|MTU|AllowedIPs|Endpoint|Jc|Jmin|Jmax|S[1-4]|H[1-4]) " "$conf" || true
+  fi
+  if command -v tcpdump >/dev/null 2>&1; then
+    echo "##### tcpdump на $NIC, 25 секунд: СЕЙЧАС включи VPN на клиенте и открой сайт"
+    timeout 25 tcpdump -ni "$NIC" -c 60 2>&1 || true
+  else
+    echo "##### tcpdump не установлен (apt install -y tcpdump), пропускаю"
+  fi
+  echo "##### конец диагностики, пришли весь вывод"
+}
+
+if [ "${1:-}" = "diag" ]; then
+  diag
+  exit 0
+fi
+
 # ---------- Шаг 1: установка сервера ----------
 if [ ! -e "$AWG_DIR/params" ]; then
   echo ">>> Шаг 1: установка AmneziaWG (протокол 2.0)"
@@ -94,6 +132,25 @@ if ! systemctl is-active --quiet "awg-quick@$NIC"; then
   echo "    reboot"
   echo "    (после перезагрузки зайди по SSH и запусти ТУ ЖЕ команду ещё раз)"
   exit 2
+fi
+
+# ---------- Шаг 2б: пересылка не должна резаться Docker/iptables ----------
+# На части VPS стоит Docker: он ставит iptables FORWARD в DROP, и правила
+# установщика (отдельная таблица nft) этого не отменяют — рукопожатие есть,
+# а интернета нет. Разрешаем пересылку для интерфейса туннеля.
+if command -v iptables >/dev/null 2>&1 \
+   && iptables -S FORWARD 2>/dev/null | grep -q '^-P FORWARD DROP'; then
+  if iptables -S DOCKER-USER >/dev/null 2>&1; then
+    FWD_CHAIN="DOCKER-USER"
+  else
+    FWD_CHAIN="FORWARD"
+  fi
+  echo ">>> iptables FORWARD = DROP, добавляю разрешение для $NIC в $FWD_CHAIN"
+  iptables -C "$FWD_CHAIN" -i "$NIC" -j ACCEPT 2>/dev/null \
+    || iptables -I "$FWD_CHAIN" 1 -i "$NIC" -j ACCEPT
+  iptables -C "$FWD_CHAIN" -o "$NIC" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null \
+    || iptables -I "$FWD_CHAIN" 1 -o "$NIC" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  echo "    (правила не переживают перезагрузку сервера — после reboot запусти скрипт снова)"
 fi
 
 # ---------- Шаг 3: протокол должен быть 2 ----------
@@ -138,4 +195,5 @@ echo "================ КОНЕЦ КОНФИГА ================"
 echo
 echo "Дальше: роутер -> VPN -> WireGuard Client -> загрузить этот конфиг -> включить."
 echo "Проверка на сервере (появится 'latest handshake' у peer): awg show"
+echo "Подключился, а интернета нет — запусти диагностику: bash $0 diag"
 echo "Когда VPS больше не нужен — удали его в панели хостинга."
